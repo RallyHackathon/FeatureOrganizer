@@ -4,6 +4,7 @@
     "server": "https://hackathon.rallydev.com",
     "sdk": "2.0p2",
     "javascript": [
+        "ProjectDialog.js",
         "App.js"
     ],
     "css": [

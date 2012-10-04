@@ -19,6 +19,7 @@ Ext.define('CustomApp', {
             }]
         }],
     layout: { type:"vbox" },
+    linkField: null,
     launch: function() {
         this.selected_requests = [];
         this.wait = new Ext.LoadMask( this, {msg: "Loading data..." } );
@@ -273,6 +274,54 @@ Ext.define('CustomApp', {
 	        });
         });
     },
+    _createExecutableStory: function( feature_id ) {
+    	console.log( "_createExecutableStory", feature_id );
+    	Ext.create('ProjectDialog',{
+    		autoShow: true,
+    		draggable: true,
+    		title: 'Project for Copied Story',
+    		listeners: {
+    			scope: this,
+    			projectChosen: {
+    				scope: this,
+    				fn: function(settings) {
+    					console.log( "projectChosen", settings.project );
+    					if ( settings.project ) {
+    						Rally.data.ModelFactory.getModel({
+					            type: 'User Story',
+					            success: function( model ) {
+					                model.load( feature_id, {
+					                    fetch: [ 'Name','Description', 'Project' ],
+					                    callback: function( feature, operation ) {
+					                        if ( operation.wasSuccessful() ) {
+					                            console.log( 'copying feature: ', feature );
+                                                var story = Ext.create(model, {
+												    Name: feature.data.Name,
+												    Description: feature.data.Description,
+                                                    Notes: feature.data._ref,
+                                                    Project: { _ref: settings.project.data._ref }
+												});
+                                                story.save({
+												    callback: function(result, operation) {
+												        if(operation.wasSuccessful()) {
+												            //Get the new defect's objectId
+												            alert( 'Created ' + result.get('FormattedID') );
+												        } else {
+                                                            console.log("oops", operation);
+                                                        }
+												    }
+												});
+					    					}
+					    				}
+                                    });
+                                }
+                            });
+                        }
+                    }
+    			}
+    		}
+    	});
+    },
     _showFeatureTree: function( tree_store ) {
         var tree_container = this.down("#features");
         var that = this;
@@ -283,6 +332,10 @@ Ext.define('CustomApp', {
                 plugins: { ptype: 'treeviewdragdrop' },
                 copy: false,
                 listeners: {
+                	itemdblclick: function( view, record, item, index ) {
+                		that._createExecutableStory(record.data.objectid);
+                		
+                	},
                     drop: function( node, data, overModel, dropPosition ) {
                         that.selected_requests = [];
                         

@@ -7,6 +7,116 @@
 
     <script type="text/javascript">
         Rally.onReady(function() {
+            /*global console, Ext */
+            Ext.define('ProjectDialog', {
+                extend: 'Rally.ui.dialog.Dialog',
+                alias: 'widget.eprojectdialog',   
+                width: 300,
+                padding: '5px',
+                items: [{
+                    xtype: 'panel',
+                    layout: { type: 'vbox' },
+                    itemId: 'dialog_box',
+                    height: 200,
+                    defaults: {
+                        padding: 5
+                    },
+                    items: [{
+                        xtype: 'container',
+                        itemId: 'outer_box',
+                        height: 100,
+                        items: [{
+                            xtype: 'component',
+                            renderTpl: "<strong>Project:</strong>"
+                        },
+                        {
+                            xtype: 'container',
+                            itemId: 'project_picker'
+                        }
+                        ]
+                    
+                    }]
+                }],
+                constructor: function( cfg ) {
+                    this.callParent(arguments);
+                    this.initConfig(cfg);
+                },
+                initComponent: function() {
+                    this.callParent(arguments);
+                    this.addEvents(
+                            /**
+                             * @event settingsChosen
+                             * Fires when user clicks OK after modifying settings
+                             */
+                            'projectChosen'
+                    );
+                    
+                    this.selected_project = null;
+                    
+                    this._placeProjectSearch();        
+                    this._placeButtons();
+                },
+                _placeProjectSearch: function() {
+                    this.project_picker = Ext.create( 'Rally.ui.ComboBox', {
+                    	storeConfig: {
+                    		autoLoad: true,
+                    		model: 'Project',
+                    		filters: [{
+                    			'property': 'Name',
+                    			'operator': 'contains',
+                    			'value': 'lati'
+                    		}]
+                    	},
+                    	displayField: 'Name',
+                    	width: 200
+                    } );
+                    this.down('#project_picker').add(this.project_picker);
+                },
+                _placeButtons: function() {
+                    this.down('#dialog_box').addDocked({
+                        xtype: 'toolbar',
+                        dock: 'bottom',
+                        padding: '0 0 10 0',
+                        layout: {
+                            pack: 'center'
+                        },
+                        ui: 'footer',
+                        items: [
+                            {
+                                xtype: 'rallybutton',
+                                text: "OK",
+                                scope: this,
+                                userAction: 'clicked done in dialog',
+                                handler: function() {
+                                    var project = this.project_picker.getValue();
+                                    this.fireEvent('projectChosen', {
+                                        project: project
+                                    });
+                                    this.close();
+                                }
+                            },
+                            {
+                                xtype: 'component',
+                                itemId: 'cancelLink',
+                                renderTpl: '<a href="#" class="dialog-cancel-link">Cancel</a>',
+                                renderSelectors: {
+                                    cancelLink: 'a'
+                                },
+                                listeners: {
+                                    click: {
+                                        element: 'cancelLink',
+                                        fn: function(){
+                                            this.close();
+                                        },
+                                        stopEvent: true
+                                    },
+                                    scope: this
+                                }
+                            }
+                        ]
+                    });
+                }
+            });
             Ext.define('CustomApp', {
                 extend: 'Rally.app.App',
                 componentCls: 'app',
@@ -28,6 +138,7 @@
                         }]
                     }],
                 layout: { type:"vbox" },
+                linkField: null,
                 launch: function() {
                     this.selected_requests = [];
                     this.wait = new Ext.LoadMask( this, {msg: "Loading data..." } );
@@ -282,6 +393,54 @@
             	        });
                     });
                 },
+                _createExecutableStory: function( feature_id ) {
+                	console.log( "_createExecutableStory", feature_id );
+                	Ext.create('ProjectDialog',{
+                		autoShow: true,
+                		draggable: true,
+                		title: 'Project for Copied Story',
+                		listeners: {
+                			scope: this,
+                			projectChosen: {
+                				scope: this,
+                				fn: function(settings) {
+                					console.log( "projectChosen", settings.project );
+                					if ( settings.project ) {
+                						Rally.data.ModelFactory.getModel({
+            					            type: 'User Story',
+            					            success: function( model ) {
+            					                model.load( feature_id, {
+            					                    fetch: [ 'Name','Description', 'Project' ],
+            					                    callback: function( feature, operation ) {
+            					                        if ( operation.wasSuccessful() ) {
+            					                            console.log( 'copying feature: ', feature );
+                                                            var story = Ext.create(model, {
+            												    Name: feature.data.Name,
+            												    Description: feature.data.Description,
+                                                                Notes: feature.data._ref,
+                                                                Project: { _ref: settings.project.data._ref }
+            												});
+                                                            story.save({
+            												    callback: function(result, operation) {
+            												        if(operation.wasSuccessful()) {
+            												            //Get the new defect's objectId
+            												            alert( 'Created ' + result.get('FormattedID') );
+            												        } else {
+                                                                        console.log("oops", operation);
+                                                                    }
+            												    }
+            												});
+            					    					}
+            					    				}
+                                                });
+                                            }
+                                        });
+                                    }
+                                }
+                			}
+                		}
+                	});
+                },
                 _showFeatureTree: function( tree_store ) {
                     var tree_container = this.down("#features");
                     var that = this;
@@ -292,6 +451,10 @@
                             plugins: { ptype: 'treeviewdragdrop' },
                             copy: false,
                             listeners: {
+                            	itemdblclick: function( view, record, item, index ) {
+                            		that._createExecutableStory(record.data.objectid);
+                            		
+                            	},
                                 drop: function( node, data, overModel, dropPosition ) {
                                     that.selected_requests = [];
                                     
