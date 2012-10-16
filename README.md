@@ -1,4 +1,4 @@
-hackathon-feature-organizer
+Feature Organizer
 ===========================
 
 A way to review and create new parents for incoming feature requests.  
