@@ -19,3 +19,6 @@ In process:
 Next:
 * Rank feature requests based on scoring criteria
 * Determine criteria for limiting which feature requests are displayed
+
+
+![screenshot](https://raw.github.com/RallyHackathon/FeatureOrganizer/master/deploy/Screenshot.png)
